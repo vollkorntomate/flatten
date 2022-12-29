@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::error::FlattenError;
+
 pub struct FlattenExecutor {
     source: String,
     pub copy: bool,
@@ -22,6 +24,12 @@ impl FlattenExecutor {
 
     pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
         let source_path = Path::new(&self.source).canonicalize()?;
+        let cwd = env::current_dir()?;
+
+        if source_path != cwd && cwd.starts_with(&source_path) {
+            let error = FlattenError::new("Cannot flatten parent directory.");
+            return Err(Box::new(error));
+        }
 
         let dir = fs::read_dir(&source_path)?;
 
