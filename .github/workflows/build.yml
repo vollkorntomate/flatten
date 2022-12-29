@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_linux:
+    name: Build for Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure Rust targets
+        run: rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu
+      - name: Build
+        run: |
+          cargo build --release --target=x86_64-unknown-linux-gnu
+          cargo build --release --target=aarch64-unknown-linux-gnu
+  build_macos:
+    name: Build for macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure Rust targets
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - name: Build
+        run: |
+          cargo build --release --target=x86_64-apple-darwin
+          cargo build --release --target=aarch64-apple-darwin
+  build_windows:
+    name: Build for Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --release
