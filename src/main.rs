@@ -51,7 +51,10 @@ pub fn fail(message: &str) {
 }
 
 fn print_version() {
-    println!("flatten v{}", env!("CARGO_PKG_VERSION"));
+    println!(
+        "flatten v{} by vollkorntomate (https://github.com/vollkorntomate/flatten)",
+        env!("CARGO_PKG_VERSION")
+    );
 }
 
 fn print_usage() {
