@@ -1,4 +1,4 @@
-use std::{env, process::exit};
+use std::{env, error::Error, process::exit};
 
 use error::FlattenError;
 use flatten::FlattenExecutor;
@@ -8,7 +8,7 @@ mod flatten;
 
 fn main() {
     let executor = parse_args().unwrap_or_else(|error| {
-        println!("{}", error.message);
+        println!("{error}");
         print_usage();
         exit(1);
     });
@@ -19,7 +19,7 @@ fn main() {
     });
 }
 
-fn parse_args() -> Result<FlattenExecutor, FlattenError> {
+fn parse_args() -> Result<FlattenExecutor, Box<dyn Error>> {
     let mut args = env::args().skip(1); // skip binary name (arg0)
 
     let arg1 = args.next().unwrap_or(String::from("-h"));
@@ -28,7 +28,7 @@ fn parse_args() -> Result<FlattenExecutor, FlattenError> {
         _ => (),
     }
 
-    let mut cmd_args = FlattenExecutor::new(arg1);
+    let mut cmd_args = FlattenExecutor::new(arg1)?;
 
     for arg in args {
         match arg.as_str() {
@@ -36,9 +36,8 @@ fn parse_args() -> Result<FlattenExecutor, FlattenError> {
             "-c" | "--copy" => cmd_args.copy = true,
             "--keep-dirs" => cmd_args.keep_dirs = true,
             _ => {
-                return Err(FlattenError {
-                    message: String::from("Unrecognized option: ") + arg.as_str(),
-                })
+                let error_msg = String::from("Unrecognized option: ") + arg.as_str();
+                return Err(Box::new(FlattenError::new(&error_msg)));
             }
         }
     }

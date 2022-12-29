@@ -1,51 +1,54 @@
 use std::{
     env,
     error::Error,
-    fs::{self, DirEntry, ReadDir},
+    fs::{self, DirEntry},
     path::{Path, PathBuf},
 };
 
 use crate::error::FlattenError;
 
 pub struct FlattenExecutor {
-    source: String,
+    source: PathBuf,
     pub copy: bool,
     pub keep_dirs: bool,
 }
 
 impl FlattenExecutor {
-    pub fn new(directory: String) -> FlattenExecutor {
-        FlattenExecutor {
-            source: directory,
+    pub fn new(directory: String) -> Result<FlattenExecutor, Box<dyn Error>> {
+        Ok(FlattenExecutor {
+            source: Path::new(directory.as_str()).canonicalize()?,
             copy: false,
             keep_dirs: false,
-        }
+        })
     }
 
     pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
-        let source_path = Path::new(&self.source).canonicalize()?;
         let cwd = env::current_dir()?;
 
-        if source_path != cwd && cwd.starts_with(&source_path) {
+        if self.source != cwd && cwd.starts_with(&self.source) {
             let error = FlattenError::new("Cannot flatten parent directory.");
             return Err(Box::new(error));
         }
 
-        let dir = fs::read_dir(&source_path)?;
-
-        self.flatten_rec(dir)?;
-        self.remove_dir(&source_path)?;
+        let source_dir = fs::read_dir(&self.source)?;
+        for dir in source_dir {
+            let dir = dir?;
+            if dir.file_type()?.is_dir() {
+                self.flatten_rec(&dir.path())?;
+                self.remove_dir(&dir.path())?; // TODO refactor duplicate code
+            }
+        }
 
         Ok(())
     }
 
-    fn flatten_rec(&self, contents: ReadDir) -> Result<(), Box<dyn Error>> {
-        for file in contents {
+    fn flatten_rec(&self, path: &Path) -> Result<(), Box<dyn Error>> {
+        let dir = fs::read_dir(path)?;
+        for file in dir {
             let file = file?;
             let file_type = file.file_type()?;
             if file_type.is_dir() {
-                let dir = fs::read_dir(file.path())?;
-                self.flatten_rec(dir)?;
+                self.flatten_rec(&file.path())?;
                 self.remove_dir(&file.path())?;
             } else if file_type.is_file() {
                 self.move_file(&file)?;
@@ -69,13 +72,13 @@ impl FlattenExecutor {
     }
 
     fn create_new_file_name(&self, file: &DirEntry) -> Result<PathBuf, Box<dyn Error>> {
-        let mut path = Path::new(".").join(file.file_name());
+        let mut path = self.source.join(file.file_name());
         let mut i = 1;
 
         while path.exists() {
             let mut new_name = file.file_name();
             new_name.push(i.to_string()); // TODO improve naming (don't modify file extension)
-            path = Path::new(".").join(new_name);
+            path = self.source.join(new_name);
             i += 1;
         }
 
@@ -83,9 +86,9 @@ impl FlattenExecutor {
     }
 
     fn remove_dir(&self, dir_path: &Path) -> Result<(), Box<dyn Error>> {
-        let is_cwd = dir_path == env::current_dir()?;
+        let is_source = dir_path == self.source;
 
-        if !(self.copy || self.keep_dirs || is_cwd) {
+        if !(self.copy || self.keep_dirs || is_source) {
             fs::remove_dir_all(dir_path)?;
         }
 
