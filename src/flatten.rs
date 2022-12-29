@@ -1,7 +1,8 @@
 use std::{
+    env,
     error::Error,
     fs::{self, DirEntry, ReadDir},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 pub struct FlattenExecutor {
@@ -20,14 +21,12 @@ impl FlattenExecutor {
     }
 
     pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
-        let dir = fs::read_dir(&self.source)?;
+        let source_path = Path::new(&self.source).canonicalize()?;
+
+        let dir = fs::read_dir(&source_path)?;
 
         self.flatten_rec(dir)?;
-
-        if !(self.copy || self.keep_dirs) {
-            // TODO don't try to delete if current_dir == source or "."
-            fs::remove_dir_all(&self.source)?;
-        }
+        self.remove_dir(&source_path)?;
 
         Ok(())
     }
@@ -39,6 +38,7 @@ impl FlattenExecutor {
             if file_type.is_dir() {
                 let dir = fs::read_dir(file.path())?;
                 self.flatten_rec(dir)?;
+                self.remove_dir(&file.path())?;
             } else if file_type.is_file() {
                 self.move_file(&file)?;
             }
@@ -49,20 +49,36 @@ impl FlattenExecutor {
 
     fn move_file(&self, file: &DirEntry) -> Result<(), Box<dyn Error>> {
         let old_path = file.path();
-        let mut new_path = Path::new(".").join(file.file_name());
-        let mut i = 1;
-
-        while new_path.exists() {
-            let mut new_name = file.file_name();
-            new_name.push(i.to_string()); // TODO improve naming (don't modify file extension)
-            new_path = Path::new(".").join(new_name);
-            i += 1;
-        }
+        let new_path = self.create_new_file_name(file)?;
 
         if self.copy {
             fs::copy(old_path, new_path)?;
         } else {
             fs::rename(old_path, new_path)?;
+        }
+
+        Ok(())
+    }
+
+    fn create_new_file_name(&self, file: &DirEntry) -> Result<PathBuf, Box<dyn Error>> {
+        let mut path = Path::new(".").join(file.file_name());
+        let mut i = 1;
+
+        while path.exists() {
+            let mut new_name = file.file_name();
+            new_name.push(i.to_string()); // TODO improve naming (don't modify file extension)
+            path = Path::new(".").join(new_name);
+            i += 1;
+        }
+
+        Ok(path)
+    }
+
+    fn remove_dir(&self, dir_path: &Path) -> Result<(), Box<dyn Error>> {
+        let is_cwd = dir_path == env::current_dir()?;
+
+        if !(self.copy || self.keep_dirs || is_cwd) {
+            fs::remove_dir_all(dir_path)?;
         }
 
         Ok(())
