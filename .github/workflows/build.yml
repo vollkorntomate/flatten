@@ -15,11 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Configure Rust targets
-        run: rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu
+        # run: rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu
+        run: rustup target add x86_64-unknown-linux-gnu
       - name: Build
-        run: |
-          cargo build --release --target=x86_64-unknown-linux-gnu
-          cargo build --release --target=aarch64-unknown-linux-gnu
+        # run: |
+        #   cargo build --release --target=x86_64-unknown-linux-gnu
+        #   cargo build --release --target=aarch64-unknown-linux-gnu
+        run: cargo build --release --target=x86_64-unknown-linux-gnu
   build_macos:
     name: Build for macOS
     runs-on: macos-latest
