@@ -25,6 +25,7 @@ fn parse_args() -> Result<FlattenExecutor, Box<dyn Error>> {
     let arg1 = args.next().unwrap_or(String::from("-h"));
     match arg1.as_str() {
         "-h" | "--help" => print_usage_and_exit(),
+        "-v" | "--version" => print_version_and_exit(),
         _ => (),
     }
 
@@ -33,6 +34,7 @@ fn parse_args() -> Result<FlattenExecutor, Box<dyn Error>> {
     for arg in args {
         match arg.as_str() {
             "-h" | "--help" => print_usage_and_exit(),
+            "-v" | "--version" => print_version_and_exit(),
             "-c" | "--copy" => cmd_args.copy = true,
             "--keep-dirs" => cmd_args.keep_dirs = true,
             _ => {
@@ -55,6 +57,11 @@ fn print_version() {
         "flatten v{} by vollkorntomate (https://github.com/vollkorntomate/flatten)",
         env!("CARGO_PKG_VERSION")
     );
+}
+
+fn print_version_and_exit() {
+    print_version();
+    exit(0);
 }
 
 fn print_usage() {
