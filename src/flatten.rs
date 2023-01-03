@@ -23,6 +23,14 @@ impl FlattenExecutor {
     }
 
     pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
+        self.check_is_parent_directory()?;
+
+        self.flatten_rec(&self.in_path)?;
+
+        Ok(())
+    }
+
+    fn check_is_parent_directory(&self) -> Result<(), Box<dyn Error>> {
         let cwd = env::current_dir()?;
 
         if self.in_path != cwd && cwd.starts_with(&self.in_path) {
@@ -30,28 +38,21 @@ impl FlattenExecutor {
             return Err(Box::new(error));
         }
 
-        let source_dir = fs::read_dir(&self.in_path)?;
-        for dir in source_dir {
-            let dir = dir?;
-            if dir.file_type()?.is_dir() {
-                self.flatten_rec(&dir.path())?;
-                self.remove_dir(&dir.path())?; // TODO refactor duplicate code
-            }
-        }
-
         Ok(())
     }
 
     fn flatten_rec(&self, path: &Path) -> Result<(), Box<dyn Error>> {
-        let dir = fs::read_dir(path)?;
-        for file in dir {
-            let file = file?;
+        let mut dir = fs::read_dir(path)?;
+        while let Some(Ok(file)) = dir.next() {
             let file_type = file.file_type()?;
             if file_type.is_dir() {
                 self.flatten_rec(&file.path())?;
                 self.remove_dir(&file.path())?;
             } else if file_type.is_file() {
-                self.move_file(&file)?;
+                if path != self.in_path {
+                    // ignore existing files in source dir (they are alredy flattened)
+                    self.move_file(&file)?;
+                }
             }
         }
 
