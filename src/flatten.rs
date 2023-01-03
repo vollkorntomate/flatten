@@ -8,7 +8,7 @@ use std::{
 use crate::error::FlattenError;
 
 pub struct FlattenExecutor {
-    source: PathBuf,
+    in_path: PathBuf,
     pub copy: bool,
     pub keep_dirs: bool,
 }
@@ -16,7 +16,7 @@ pub struct FlattenExecutor {
 impl FlattenExecutor {
     pub fn new(directory: String) -> Result<FlattenExecutor, Box<dyn Error>> {
         Ok(FlattenExecutor {
-            source: Path::new(directory.as_str()).canonicalize()?,
+            in_path: Path::new(directory.as_str()).canonicalize()?,
             copy: false,
             keep_dirs: false,
         })
@@ -25,12 +25,12 @@ impl FlattenExecutor {
     pub fn flatten(&self) -> Result<(), Box<dyn Error>> {
         let cwd = env::current_dir()?;
 
-        if self.source != cwd && cwd.starts_with(&self.source) {
+        if self.in_path != cwd && cwd.starts_with(&self.in_path) {
             let error = FlattenError::new("Cannot flatten parent directory.");
             return Err(Box::new(error));
         }
 
-        let source_dir = fs::read_dir(&self.source)?;
+        let source_dir = fs::read_dir(&self.in_path)?;
         for dir in source_dir {
             let dir = dir?;
             if dir.file_type()?.is_dir() {
@@ -72,13 +72,13 @@ impl FlattenExecutor {
     }
 
     fn create_new_file_name(&self, file: &DirEntry) -> Result<PathBuf, Box<dyn Error>> {
-        let mut path = self.source.join(file.file_name());
+        let mut path = self.in_path.join(file.file_name());
         let mut i = 1;
 
         while path.exists() {
             let mut new_name = file.file_name();
             new_name.push(i.to_string()); // TODO improve naming (don't modify file extension)
-            path = self.source.join(new_name);
+            path = self.in_path.join(new_name);
             i += 1;
         }
 
@@ -86,7 +86,7 @@ impl FlattenExecutor {
     }
 
     fn remove_dir(&self, dir_path: &Path) -> Result<(), Box<dyn Error>> {
-        let is_source = dir_path == self.source;
+        let is_source = dir_path == self.in_path;
 
         if !(self.copy || self.keep_dirs || is_source) {
             fs::remove_dir_all(dir_path)?;
